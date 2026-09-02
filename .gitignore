@@ -1,0 +1,6 @@
+/obiguard-zap-agent
+/dist/
+*.test
+.DS_Store
+.idea
+.claude

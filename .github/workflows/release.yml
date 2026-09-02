@@ -1,0 +1,147 @@
+# Builds, signs and publishes a release when a v* tag lands in this repo.
+#
+# The tag is pushed here by the private source repo's release pipeline, so
+# this workflow is the public half: everything a user downloads is built
+# from source they can read, in a run they can inspect, and the provenance
+# attestations point at this public commit. No credential from the private
+# side is needed here — GHCR is reached with the run's own GITHUB_TOKEN.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+# Least privilege by default; each job widens only what it needs.
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # Gate the release on the tests passing. A tag that fails here publishes
+  # nothing, rather than shipping and being yanked afterwards.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  binaries:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # create the GitHub Release
+      id-token: write       # keyless signing identity for the attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The four platforms internal/toolchain has JRE archives for — there
+      # is no point shipping a binary for a platform the agent cannot
+      # provision ZAP on.
+      - name: Build
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os="${platform%/*}"; arch="${platform#*/}"
+            echo "building $os/$arch"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=${BUILD_DATE}" \
+              -o "dist/obiguard-zap-agent_${os}_${arch}" ./cmd/agent
+          done
+          cd dist && sha256sum * > checksums.txt && cat checksums.txt
+
+      # Signed provenance for each binary, verifiable with:
+      #   gh attestation verify <file> --repo obiguard/obiguard-zap-agent
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/obiguard-zap-agent_*'
+
+      # `gh` is preinstalled on the runner, so the release is cut without
+      # trusting a third-party action with contents:write.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            dist/*
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write       # push to GHCR
+      id-token: write       # cosign keyless + attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # No QEMU: the Go stage cross-compiles on the native runner and the
+      # final stage only COPYs into ZAP's (already multi-arch) image, so
+      # nothing has to be emulated to produce the arm64 variant.
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          # v1.2.3 → :1.2.3, :1.2, :1 and :latest. Prereleases (v1.2.3-rc1)
+          # deliberately do not move :latest.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          # buildx attaches an SBOM and max-detail SLSA provenance to the
+          # image itself, so `docker buildx imagetools inspect` answers
+          # "what is in this and where did it come from" without us hosting
+          # anything separately.
+          sbom: true
+          provenance: mode=max
+
+      - uses: sigstore/cosign-installer@v3
+
+      # Keyless signature bound to this workflow's OIDC identity — nothing
+      # to store, nothing to rotate, and no private key that can leak.
+      # Verify with the command documented in README.md.
+      - name: Sign image
+        run: cosign sign --yes "${IMAGE}@${{ steps.build.outputs.digest }}"
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

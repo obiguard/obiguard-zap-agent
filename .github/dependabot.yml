@@ -1,0 +1,22 @@
+# Dependabot keeps the three things this repo depends on current. The
+# github-actions ecosystem also rewrites version tags to pinned commit
+# SHAs and maintains them, which is how the workflows stay pinned without
+# anyone hand-copying digests.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Watches the digest-pinned zaproxy/zap-stable base image so a new ZAP
+  # release arrives as a reviewable PR rather than being missed.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

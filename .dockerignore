@@ -1,0 +1,15 @@
+# The build stage does `COPY . .`, so anything not excluded here lands in
+# the build context and, worse, in a layer. None of this belongs in a
+# published image.
+.git
+.gitignore
+.gitlab-ci.yml
+.github
+.idea
+.claude
+.DS_Store
+**/.DS_Store
+publish/
+dist/
+obiguard-zap-agent
+*.test
