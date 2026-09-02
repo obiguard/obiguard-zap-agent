@@ -8,7 +8,7 @@
 # architecture and cross-compiles instead: Go does that for free, whereas
 # emulating the toolchain under QEMU to build the arm64 image costs minutes
 # for no benefit. TARGETOS/TARGETARCH are supplied by buildx per platform.
-FROM --platform=$BUILDPLATFORM golang:1.24 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27 AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
