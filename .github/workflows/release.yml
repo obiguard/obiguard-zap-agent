@@ -24,7 +24,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -39,7 +39,7 @@ jobs:
       id-token: write       # keyless signing identity for the attestation
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -89,7 +89,7 @@ jobs:
       id-token: write       # cosign keyless + attestation
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # No QEMU: the Go stage cross-compiles on the native runner and the
       # final stage only COPYs into ZAP's (already multi-arch) image, so
