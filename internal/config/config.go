@@ -11,10 +11,17 @@ import (
 	"time"
 )
 
+// DefaultRelayURL is Obiguard's hosted relay — where all but a handful of
+// installs should point. It is a default rather than a required setting so
+// the common case is `AGENT_TOKEN=... obiguard-zap-agent` and nothing else;
+// RELAY_URL still overrides it for staging and self-hosted relays.
+const DefaultRelayURL = "https://zap-agent.obiguard.ai"
+
 type Config struct {
 	// Where the agent polls for jobs and uploads results — Obiguard's
-	// hosted relay, e.g. https://zap-agent.obiguard.ai. Never a customer's
-	// own infrastructure; this agent only ever dials out to Obiguard.
+	// hosted relay. Defaults to DefaultRelayURL; RELAY_URL overrides it.
+	// Never a customer's own infrastructure; this agent only ever dials out
+	// to Obiguard.
 	RelayURL string
 	// Per-org bearer token, issued once from the portal at enrollment time.
 	AgentToken string
@@ -54,7 +61,7 @@ type ToolchainConfig struct {
 func Load() (Config, error) {
 	relayURL := os.Getenv("RELAY_URL")
 	if relayURL == "" {
-		return Config{}, fmt.Errorf("RELAY_URL is required (e.g. https://zap-agent.obiguard.ai)")
+		relayURL = DefaultRelayURL
 	}
 	token := os.Getenv("AGENT_TOKEN")
 	if token == "" {

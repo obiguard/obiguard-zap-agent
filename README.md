@@ -38,7 +38,6 @@ This repo's own [Dockerfile](Dockerfile) layers the agent binary onto ZAP's offi
 
 ```bash
 docker run -d --name obiguard-zap-agent \
-  -e RELAY_URL=https://zap-agent.obiguard.ai \
   -e AGENT_TOKEN=<token from the Attack Surface page in the Obiguard portal> \
   ghcr.io/obiguard/obiguard-zap-agent:1
 ```
@@ -52,10 +51,14 @@ No Docker socket, no privileged access — this container only ever talks outbou
 Nothing to install alongside it. On its first start the agent provisions its own ZAP and Java runtime, then runs every job with those.
 
 ```bash
-export RELAY_URL=https://zap-agent.obiguard.ai
 export AGENT_TOKEN=<token from the Attack Surface page in the Obiguard portal>
 ./obiguard-zap-agent
 ```
+
+The token is the only thing you have to supply — the agent talks to
+Obiguard's hosted relay at `https://zap-agent.obiguard.ai` unless you set
+`RELAY_URL` to point somewhere else. The relay it settled on is in the
+startup log line, so you can always see which one a running agent is using.
 
 To pay that one-time download up front — at install time, in an image build, or just to check the machine can reach the downloads before you enrol it — run it once with the `provision` subcommand, which needs no token:
 
@@ -67,7 +70,7 @@ Already have ZAP on the machine? Put its `zap.sh` on `PATH` (or point `ZAP_CMD` 
 
 | Env var | Required | Default | Purpose |
 |---|---|---|---|
-| `RELAY_URL` | yes | — | Where to poll for jobs and upload results. |
+| `RELAY_URL` | no | `https://zap-agent.obiguard.ai` | Where to poll for jobs and upload results. Set it only for a staging or self-hosted relay. |
 | `AGENT_TOKEN` | yes | — | Per-org token from the portal's Attack Surface page. Treat it like a password. |
 | `WORK_DIR` | no | `/tmp/obiguard-zap-agent` | Scratch space for one job's plan and report at a time. |
 | `TOOLCHAIN_DIR` | no | `~/.obiguard-zap-agent/toolchain` | Where the ZAP and JRE the agent provisions are unpacked, and found again on later runs. Keep it on persistent storage, or the download repeats. |

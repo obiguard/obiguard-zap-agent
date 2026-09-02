@@ -2,11 +2,33 @@ package config
 
 import "testing"
 
-func TestLoad_RequiresRelayURL(t *testing.T) {
+// An unset RELAY_URL is the normal case: nearly every install talks to
+// Obiguard's hosted relay, so requiring it would be one more thing to get
+// wrong for no benefit.
+func TestLoad_DefaultsRelayURL(t *testing.T) {
 	t.Setenv("RELAY_URL", "")
 	t.Setenv("AGENT_TOKEN", "token")
-	if _, err := Load(); err == nil {
-		t.Fatal("expected an error when RELAY_URL is unset")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.RelayURL != DefaultRelayURL {
+		t.Errorf("RelayURL = %q, want the default %q", cfg.RelayURL, DefaultRelayURL)
+	}
+}
+
+// ...but a self-hosted or staging relay must still win.
+func TestLoad_RelayURLOverride(t *testing.T) {
+	t.Setenv("RELAY_URL", "https://zap-agent.staging.obiguard.ai")
+	t.Setenv("AGENT_TOKEN", "token")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.RelayURL != "https://zap-agent.staging.obiguard.ai" {
+		t.Errorf("RelayURL = %q, want the RELAY_URL value", cfg.RelayURL)
 	}
 }
 
@@ -19,7 +41,7 @@ func TestLoad_RequiresAgentToken(t *testing.T) {
 }
 
 func TestLoad_Defaults(t *testing.T) {
-	t.Setenv("RELAY_URL", "https://zap-agent.obiguard.ai")
+	t.Setenv("RELAY_URL", "")
 	t.Setenv("AGENT_TOKEN", "token")
 	t.Setenv("WORK_DIR", "")
 	t.Setenv("ZAP_CMD", "")
@@ -43,6 +65,9 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 	if cfg.ScanTimeout.Minutes() != 30 {
 		t.Errorf("ScanTimeout = %v, want 30m default", cfg.ScanTimeout)
+	}
+	if cfg.RelayURL != DefaultRelayURL {
+		t.Errorf("RelayURL = %q, want the default %q", cfg.RelayURL, DefaultRelayURL)
 	}
 }
 
