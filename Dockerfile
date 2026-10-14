@@ -35,7 +35,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
 # made, not whatever the tag happened to point at when CI ran. This digest
 # is the multi-arch index, so it still resolves per-platform. Bump it
 # deliberately — Dependabot watches it via .github/dependabot.yml.
-FROM zaproxy/zap-stable:latest@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+FROM zaproxy/zap-stable:latest@sha256:7aaa659b0d43078febd82e29bad112285c370727e86ab8340444220e17d9f0d2
 USER root
 COPY --from=build /out/obiguard-zap-agent /usr/local/bin/obiguard-zap-agent
 # ZAP's own image already runs as a non-root "zap" user with a writable
