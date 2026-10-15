@@ -96,7 +96,7 @@ jobs:
       # nothing has to be emulated to produce the arm64 variant.
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
